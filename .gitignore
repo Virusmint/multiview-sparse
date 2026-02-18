@@ -1,0 +1,9 @@
+data/
+fonts/
+venv/
+build/
+figures/
+
+.DS_Store
+*.synctex.gz
+*.otf
