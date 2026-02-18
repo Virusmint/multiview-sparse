@@ -1,0 +1,90 @@
+\usepackage{amsmath,amsfonts,amssymb} % Math packages
+\usepackage{mathtools} % For defining floor and ceiling functions
+\usepackage{amsthm}    % Theorems
+\usepackage{bm} 	     % Bold math
+\usepackage{bbm}	     % More bold math?
+\usepackage{array}     % Better tables
+\usepackage{physics}   % derivatives and partials
+\usepackage{float}     % Better positioning [H]
+\usepackage{framed}    % Framed boxes
+\usepackage{geometry}  % Required for adjusting page dimensions and margins
+\usepackage{graphicx}  % Include images
+\usepackage{multirow}  % multicolumn tables
+\usepackage{pgfplots}  % Create plots in latex
+\usepackage{siunitx}   % SI unit system
+\usepackage{listings}  % Code environments
+\usepackage[shortlabels]{enumitem} %lets us change the enumeration to (a), (b), ...
+\usepackage{booktabs}  % Better looking horizontal rules
+\usepackage{makecell}  % Pre-formatting of column heads
+\usepackage{hyperref}  % Clickable links
+\usepackage{tikz}      % Graphs
+\usepackage{cancel}    % Cancel out terms
+\usetikzlibrary{shapes,arrows,positioning} % Graph arrows
+\usetikzlibrary{automata,positioning,fit,shapes.geometric,backgrounds} % Node grouping
+\usetikzlibrary{calc, tikzmark}  % Marking equations
+\renewcommand{\arraystretch}{1.6}
+
+\usepackage{mathtools}
+\newcommand{\defeq}{\vcentcolon=}
+\newcommand{\eqdef}{=\vcentcolon}
+
+\newtheorem*{definition}{Definition}
+\newtheorem*{theorem}{Theorem}
+\newtheorem*{lemma}{Lemma}
+\theoremstyle{definition}
+\newtheorem{question}{Question}
+\pgfplotsset{width=10cm,compat=1.9}
+
+% stats commands
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Var}{\mathbb{V}\mathrm{ar}}
+\newcommand{\Cov}{\mathbb{C}\mathrm{ov}}
+\newcommand{\Risk}{\mathcal{R}}
+\newcommand{\Bias}{\mathrm{Bias}}
+\newcommand{\MSE}{\mathrm{MSE}}
+\newcommand{\Normal}{\mathcal{N}}
+\newcommand{\Exponential}{\mathrm{Exp}}
+\newcommand{\Poisson}{\mathrm{Poisson}}
+\newcommand{\Bernoulli}{\mathrm{Bernoulli}}
+\newcommand{\Binomial}{\mathrm{Binomial}}
+\newcommand{\Uniform}{\mathrm{Uniform}}
+\newcommand{\Beta}{\mathrm{Beta}}
+\newcommand{\GammaDist}{\mathrm{Gamma}}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+% Common number sets
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\C}{\mathbb{C}}
+
+% Cs stuff
+\newcommand{\bigO}{\mathcal{O}}
+
+% Indicator function
+\newcommand{\Ind}[1]{\mathbbm{1}_{\{#1\}}}
+
+\DeclarePairedDelimiter\ceil{\lceil}{\rceil}
+\DeclarePairedDelimiter\floor{\lfloor}{\rfloor}
+\DeclarePairedDelimiter\angleb{\langle}{\rangle}
+
+\geometry{
+	paper=a4paper, % Paper size, change to letterpaper for US letter size
+  margin=1in, % Margin size
+	headheight=14pt, % Header height
+	footskip=1.5cm, % Space from the bottom margin to the baseline of the footer
+	headsep=1.2cm, % Space from the top margin to the baseline of the header
+}
+
+\makeatletter
+\renewcommand{\maketitle}{
+  \begin{center}
+    {\large\bfseries \@title \par}
+    \vskip 1em
+    {\@author}
+  \end{center}
+}
+\makeatother
+

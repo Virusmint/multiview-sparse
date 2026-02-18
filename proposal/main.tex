@@ -1,120 +1,44 @@
 \documentclass[a4paper,12pt]{article}
-\usepackage{amsmath,amsfonts,amssymb} % Math packages
-\usepackage{mathtools} % For defining floor and ceiling functions
-\usepackage{amsthm}    % Theorems
-\usepackage{bm} 	     % Bold math
-\usepackage{bbm}	     % More bold math?
-\usepackage{array}     % Better tables
-\usepackage{physics}   % derivatives and partials
-\usepackage{float}     % Better positioning [H]
-\usepackage{framed}    % Framed boxes
-\usepackage{geometry}  % Required for adjusting page dimensions and margins
-\usepackage{graphicx}  % Include images
-\usepackage{multirow}  % multicolumn tables
-\usepackage{pgfplots}  % Create plots in latex
-\usepackage{siunitx}   % SI unit system
-\usepackage{listings}  % Code environments
-\usepackage[shortlabels]{enumitem} %lets us change the enumeration to (a), (b), ...
-\usepackage{booktabs}  % Better looking horizontal rules
-\usepackage{makecell}  % Pre-formatting of column heads
-\usepackage{hyperref}  % Clickable links
-\usepackage{tikz}      % Graphs
-\usepackage{cancel}    % Cancel out terms
-\usetikzlibrary{shapes,arrows,positioning} % Graph arrows
-\usetikzlibrary{automata,positioning,fit,shapes.geometric,backgrounds} % Node grouping
-\usetikzlibrary{calc, tikzmark}  % Marking equations
-\renewcommand{\arraystretch}{1.6}
-
-\usepackage{mathtools}
-\newcommand{\defeq}{\vcentcolon=}
-\newcommand{\eqdef}{=\vcentcolon}
-
-\newtheorem*{definition}{Definition}
-\newtheorem*{theorem}{Theorem}
-\newtheorem*{lemma}{Lemma}
-\theoremstyle{definition}
-\newtheorem{question}{Question}
-\pgfplotsset{width=10cm,compat=1.9}
-
-% stats commands
-\newcommand{\E}{\mathbb{E}}
-\newcommand{\Var}{\mathbb{V}\mathrm{ar}}
-\newcommand{\Cov}{\mathbb{C}\mathrm{ov}}
-\newcommand{\Risk}{\mathcal{R}}
-\newcommand{\Bias}{\mathrm{Bias}}
-\newcommand{\MSE}{\mathrm{MSE}}
-\newcommand{\Normal}{\mathcal{N}}
-\newcommand{\Exponential}{\mathrm{Exp}}
-\newcommand{\Poisson}{\mathrm{Poisson}}
-\newcommand{\Bernoulli}{\mathrm{Bernoulli}}
-\newcommand{\Binomial}{\mathrm{Binomial}}
-\newcommand{\Uniform}{\mathrm{Uniform}}
-\newcommand{\Beta}{\mathrm{Beta}}
-\newcommand{\GammaDist}{\mathrm{Gamma}}
-\DeclareMathOperator*{\argmax}{arg\,max}
-\DeclareMathOperator*{\argmin}{arg\,min}
-
-% Common number sets
-\newcommand{\N}{\mathbb{N}}
-\newcommand{\R}{\mathbb{R}}
-\newcommand{\Q}{\mathbb{Q}}
-\newcommand{\Z}{\mathbb{Z}}
-\newcommand{\C}{\mathbb{C}}
-
-% Cs stuff
-\newcommand{\bigO}{\mathcal{O}}
-
-% Indicator function
-\newcommand{\Ind}[1]{\mathbbm{1}_{\{#1\}}}
-
-\DeclarePairedDelimiter\ceil{\lceil}{\rceil}
-\DeclarePairedDelimiter\floor{\lfloor}{\rfloor}
-\DeclarePairedDelimiter\angleb{\langle}{\rangle}
-
-\geometry{
-	paper=a4paper, % Paper size, change to letterpaper for US letter size
-  margin=1in, % Margin size
-	headheight=14pt, % Header height
-	footskip=1.5cm, % Space from the bottom margin to the baseline of the footer
-	headsep=1.2cm, % Space from the top margin to the baseline of the header
-}
-
-\makeatletter
-\renewcommand{\maketitle}{
-  \begin{center}
-    {\large\bfseries \@title \par}
-    \vskip 1em
-    {\@author}
-  \end{center}
-}
-\makeatother
-
-\let\tss\textsuperscript % superscript macro
-\let\oldtextbf\textbf
-\renewcommand{\textbf}[1]{\oldtextbf{\boldmath #1}}
-
+\include{../preamble}
 % The title of the report
-\title{COMP 588 Project Proposal:}
+\title{COMP 588 Project Proposal: Stress-Testing Block-Identifiability Under Cross-Modal Misalignment in Multimodal Contrastive Learning}
 % Write your name in author
 \author{Dowoo Kim, Ryan Jackson, David Zhao}
-% Course code and date
-\date{MATH 324, Winter 2024}
 
 \begin{document}
 \maketitle
-
-
-We preface this proposal by indicating that our work will extend the results of Cai et al. (2025) in their paper ‘On the Value of Cross-Modal Misalignment in Multimodal Representation Learning’. Specifically, we first aim to reproduce their experimental findings, and then stress-test their theoretical framework by exploring the effects of misalignment in a wider variety of settings, including stronger perturbation bias (more on this later).
+We preface this proposal by indicating that our work will reproduce and extend the results of Cai et al. (2025) in their paper ‘On the Value of Cross-Modal Misalignment in Multimodal Representation Learning’ \cite{cai2025valuecrossmodalmisalignmentmultimodal}
 
 \subsection*{Background and Motivation}
 
-Multimodal representation learning seeks to learn a shared representation across multiple modalities, such as images and text, so that semantically related samples from different modalities are mapped close together in the shared representation space. This allows for interesting applications such as cross-modal retrieval, out-of-distribution generalization, and zero-shot learning. \\
+Multimodal representation learning seeks to learn a shared representation across multiple modalities, such as images and text, so that semantically related samples from different modalities are mapped close together in the shared representation space. This allows for interesting applications such as cross-modal retrieval, out-of-distribution generalization, and zero-shot learning. One dominant approach is Multimodal Contrastive Learning (MMCL), exemplified by models such as CLIP. MMCL uses a contrastive loss to pull the representations of paired samples together in the shared embedding space (e.g., an image and its corresponding caption), and push apart the representations of unpaired samples. Despite its tremendous success, this approach heavily relies on the perfect semantic alignment of the paired data - an image and caption are assumed to be identical views of the same underlying concept. This can be quite problematic as real-world datasets (e.g., LAION-400M) often exhibit significant cross-modal misalignment. For instance, human-annotated captions often omit critical visual details, vary in quality, or even contain irrelevant/misleading information. \\
 
-Currently, one dominant approach to this problem is Multimodal Contrastive Learning (MMCL), exemplified by models such as CLIP. MMCL uses a contrastive loss such as InfoNCE to pull together the representations of paired samples in the shared embedding space (e.g., an image and its corresponding caption), and push apart the representations of unpaired samples. Despite its success, this approach heavily relies on the perfect semantic alignment of the paired data - an image and caption are assumed to be identical views of the same underlying concept. This can be quite problematic as real-world datasets (e.g., LAION-400M) often exhibit significant cross-modal misalignment. For instance, human-annotated captions often omit critical visual details, vary in quality, or even contain irrelevant/misleading information. \\
+Historically, researchers have attempted to deal with this misalignment by viewing it in two opposing ways: as a detrimental noise that should be mitigated, or as a beneficial source of diversity that leads to more robust representations. In the paper we are building on, Cai et al. (2025) reconcile these views by formulating the problem using a latent variable model (LVM), which captures the underlying semantic structure of the data while explicitly modeling the misalignment in the LVM. Their proposed framework allows for arbitrary dependencies among the latent semantic variables, which circumvents many of the limitations of prior works that often enforce strong independence assumptions, or specific graphical structures on the latent variables.
 
-Historically, researchers have attempted to deal with this misalignment by viewing it in two opposing ways: as a detrimental noise that should be mitigated, or as a beneficial source of diversity that leads to more robust representations. Cai et al. (2025) reconcile these views by formulating the problem using a latent variable model (LVM), which captures the underlying semantic structure of the data while explicitly modeling the misalignment as a latent variable. Their proposed LVM framework
+Within the LVM framework, it can be shown that, under mild assumptions, the model can block-identify the latent semantic variables up to an invertible transformation, even in the presence of misalignment \cite{NEURIPS2021_8929c70f}. Here, block-identifiability is a relaxation of the standard notion of identifiability, which allows for the latent variables to be identified in blocks rather than individually. While this is a weaker form of identifiability, the authors argue through empirical studies that it is sufficient for learning useful representations. Another point of consideration is the amount of misalignment that can be tolerated while still achieving block-identifiability. To that end, the authors divide the misalignment into two types: selection bias, which occurs when the text captions omit certain semantic information present in the images, and perturbation bias, which occurs when the text captions contain additional irrelevant or misleading semantic information not present in the images. Empirically, they demonstrate that misaligned semantic information is largely discarded by the learned representation. However, in their perturbation experiments, the perturbations were often applied at a very high rate, which raises the question of whether block-identifiability can still be achieved under more moderate levels of misalignment.
 
-Within their LVM framework, they identify two types of misalignment mechanisms, each differing by their effects on the latent semantic variables. The first, selection bias, arises when the observed text depends only on a non-empty subset of the semantic variables, thereby inducing information loss. For example, a caption might note the color of an object in an image, but omit its texture or its shape. The second, perturbation bias, occurs when the semantic variables influencing the observed text are corrupted or altered, such as misannotating an apple’s color as ‘black’ instead of ‘red’\footnote{One might notice that the misalignment biases we have targeted so far only include text captions. However, these biases are not limited to any particular modality; our focus on textual annotations stems from the observation that human-generated annotations are more susceptible to such biases}. \\.
+\subsection*{Objective and Evaluation Criteria}
 
+In this work, we extend their analysis by examining whether block identifiability can still be achieved when perturbations occur at more moderate rates. This question is practically important, as real-world datasets are rarely free of annotation errors or semantic noise. For a method to be useful in practice, it must remain robust under realistic levels of corruption. This consideration is particularly relevant in large-scale settings, where lower-quality or weakly curated data are often incorporated. \\
 
-\end{document} 
+We will evaluate the performance of the learned representations using several criteria:
+\begin{itemize}
+  \item First, we will evaluate the block-identifiability of the learned representations using the standard metric: the mean correlation coefficient (MCC) for discrete ground-truth latent variables, and the $R^2$ score for continuous ones. The results should be comparable to those reported by Cai et al. (2025) in their experiments.
+  \item We will also evaluate the robustness of the learned representations to misalignment by measuring the degradation in performance as the level of misalignment increases. This will allow us to quantify the tolerance of the model to misalignment and identify the thresholds at which performance significantly deteriorates.
+\end{itemize}
+
+\subsection*{Datasets}
+
+We will conduct our experiments on several types of datasets:
+\begin{itemize}
+  \item First, we will use a fully controlled synthetic setting in which the semantic and modality specific latents will be generated from multivariate Gaussian distributions, which we will use to randomly initialize image and text data using invertible MLPs. The synthetic setting is ideal for investigating the effects of statistical dependencies in the latents, as we can easily control dependencies through the covariance matrices of the Gaussian models. 
+  \item We will also use the semi-synthetic dataset Causal3DIdent, a common benchmark dataset in causal representation learning. We will utilize Causal3DIdent to synthesize images from a predefined latent causal structure. Corresponding text captions will be generated from several templates incorporating semantic information used in the image generation.
+\end{itemize}
+
+\subsection*{Data and Code Availability}
+This research extends the simulation framework and misalignment protocols established by Cai et al. (2025), whose original implementation is publicly available on GitHub. The Causal3DIdent dataset is a publicly available benchmark for causal representation learning, accessible via its official repository.
+
+\newpage
+\bibliographystyle{unsrt}
+\bibliography{ref.bib}
+\end{document}
