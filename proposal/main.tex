@@ -32,11 +32,11 @@ We will evaluate the performance of the learned representations using several cr
 We will conduct our experiments on several types of datasets:
 \begin{itemize}
   \item First, we will use a fully controlled synthetic setting in which the semantic and modality specific latents will be generated from multivariate Gaussian distributions, which we will use to randomly initialize image and text data using invertible MLPs. The synthetic setting is ideal for investigating the effects of statistical dependencies in the latents, as we can easily control dependencies through the covariance matrices of the Gaussian models. 
-  \item We will also use the semi-synthetic dataset Causal3DIdent, a common benchmark dataset in causal representation learning. We will utilize Causal3DIdent to synthesize images from a predefined latent causal structure. Corresponding text captions will be generated from several templates incorporating semantic information used in the image generation.
+  \item We will also use the semi-synthetic dataset Causal3DIdent, a common benchmark dataset in causal representation learning \cite{julius_von_kugelgen_2021_4784282}. We will utilize Causal3DIdent to synthesize images from a predefined latent causal structure. Corresponding text captions will be generated from several templates incorporating semantic information used in the image generation.
 \end{itemize}
 
 \subsection*{Data and Code Availability}
-This research extends the simulation framework and misalignment protocols established by Cai et al. (2025), whose original implementation is publicly available on GitHub. The Causal3DIdent dataset is a publicly available benchmark for causal representation learning, accessible via its official repository.
+This research extends the simulation framework and misalignment protocols established by Cai et al. (2025), whose original implementation is publicly available on \href{https://github.com/YichaoCai1/crossmodal_misalignment/tree/main}{Github}. The Causal3DIdent dataset is a publicly available benchmark for causal representation learning, accessible via its \href{https://zenodo.org/records/4784282#.YgWo0PXMKbg}{official repository}.
 
 \newpage
 \bibliographystyle{unsrt}
