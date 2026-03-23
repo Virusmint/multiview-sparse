@@ -1,0 +1,46 @@
+\documentclass[a4paper,12pt]{article}
+\include{../preamble}
+% The title of the report
+\title{Stress-Testing Block-Identifiability Under Cross-Modal Misalignment in Multimodal Contrastive Learning}
+% Write your name in author
+\author{Dowoo Kim, Ryan Jackson, David Zhao}
+
+\begin{document}
+\maketitle
+We preface this proposal by indicating that our work will reproduce and extend the results of Cai et al. (2025) in their paper ‘On the Value of Cross-Modal Misalignment in Multimodal Representation Learning’ \cite{cai2025valuecrossmodalmisalignmentmultimodal}
+
+\subsection*{Background and Motivation}
+
+Multimodal representation learning seeks to learn a shared representation across multiple modalities, such as images and text, so that semantically related samples from different modalities are mapped close together in the shared representation space. This allows for interesting applications such as cross-modal retrieval, out-of-distribution generalization, and zero-shot learning. One dominant approach is Multimodal Contrastive Learning (MMCL), exemplified by models such as CLIP. MMCL uses a contrastive loss to pull the representations of paired samples together in the shared embedding space (e.g., an image and its corresponding caption), and push apart the representations of unpaired samples. Despite its tremendous success, this approach heavily relies on the perfect semantic alignment of the paired data - an image and caption are assumed to be identical views of the same underlying semantic variables. This can be quite problematic as real-world datasets (e.g., LAION-400M) often exhibit significant cross-modal misalignment. For instance, human-annotated captions often omit critical visual details, vary in quality, or even contain irrelevant/misleading information. Thus, it is of natural interest to investigate the problem of learning latents in misaligned settings. \\
+
+Cai et al. (2025) study the ability of contrastive learning to recover shared semantic variables under two types of misalignment, motivated by image–text pairing tasks. In their setting, two views are observed: an image view and a text view. The underlying latent variable model (LVM) generating these views is partitioned into three components: image-specific variables, and text-specific variables, and shared semantic variables. Within this setting, the authors analyze how two specific misalignment mechanisms specifically impair the recoverability of the shared semantic variables. The first, selection bias, arises when the observed text depends only on a non-empty subset of the semantic variables, thereby inducing information loss. The second, perturbation bias, occurs when the semantic variables influencing the observed text are corrupted or altered during generation. \\
+
+Under mild assumptions, Cai et al. (2025) prove that a contrastive learning approach can achieve block-identifiability\footnote{Block-identifiability is a relaxed notion of identifiability that allows for the recovery of the underlying latent variables up to distinct semantic groups, rather than exact recovery of each individual variable.} of the \textit{unbiased} semantic variables from image–text pairs. Empirically, they demonstrate that misaligned semantic information is largely discarded by the learned representation. However, their analysis focuses on extreme cases of misalignment where the perturbations were applied quite aggressively. This raises the question of whether block identifiability can still be achieved under more moderate levels of misalignment, which are more representative of real-world scenarios.
+
+
+
+\subsection*{Objective and Evaluation Criteria}
+
+In this work, we extend their analysis by examining whether block identifiability can still be achieved when perturbations occur at more moderate rates. This question is practically important, as real-world datasets are rarely free of annotation errors or semantic noise. For a method to be useful in practice, it must remain robust under realistic levels of corruption. This consideration is particularly relevant in large-scale settings, where lower-quality or weakly curated data are often incorporated. \\
+
+We will evaluate the performance of the learned representations using several criteria:
+\begin{itemize}
+  \item First, we will evaluate the block-identifiability of the learned representations using the standard metric: the Matthew Correlation Coefficient (MCC) for discrete ground-truth latent variables, and the $R^2$ score for continuous ones. The results should be comparable to those reported by Cai et al. (2025) in their experiments.
+  \item Second, we will evaluate the robustness of the learned representations to misalignment by measuring the degradation in performance as the level of misalignment increases. This will allow us to quantify the tolerance of the model to misalignment and identify the thresholds at which performance significantly deteriorates.
+\end{itemize}
+
+\subsection*{Datasets}
+
+We will conduct our experiments on several types of datasets:
+\begin{itemize}
+  \item First, we will use a fully controlled synthetic setting in which the semantic and modality specific latents will be generated from multivariate Gaussian distributions, which we will use to randomly initialize image and text data using invertible MLPs. This synthetic setting is ideal for investigating the effects of statistical dependencies in the latents, as we can easily control the dependencies through the covariance matrices of the Gaussian models.
+  \item We will also use the semi-synthetic dataset Causal3DIdent, a common benchmark dataset in causal representation learning \cite{julius_von_kugelgen_2021_4784282}. We will utilize Causal3DIdent to synthesize images from a predefined latent causal structure. Corresponding text captions will be generated from several templates incorporating semantic information used in the image generation.
+\end{itemize}
+
+\subsection*{Data and Code Availability}
+This research extends the simulation framework and misalignment protocols established by Cai et al. (2025), whose original implementation is publicly available on \href{https://github.com/YichaoCai1/crossmodal_misalignment/tree/main}{Github}. The Causal3DIdent dataset is a publicly available benchmark for causal representation learning, accessible via its \href{https://zenodo.org/records/4784282#.YgWo0PXMKbg}{official repository}.
+
+\newpage
+\bibliographystyle{unsrt}
+\bibliography{ref.bib}
+\end{document}
