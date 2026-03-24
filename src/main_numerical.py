@@ -10,29 +10,46 @@ from loss import SymmetricedInfoNCE
 from trainer import Trainer
 
 
-def train_model(model, dataloader, optimizer, criterion, epochs, device):
+def train_model(
+    model, train_dataloader, val_dataloader, optimizer, criterion, epochs, device
+):
     model.to(device)
-    model.train()
 
-    for epoch in range(epochs):
-        epoch_loss = 0.0
+    try:
+        for epoch in range(epochs):
+            # Training step
+            model.train()
+            train_loss = 0.0
+            for x1, x2, _ in train_dataloader:
+                x1, x2 = x1.to(device), x2.to(device)
+                # Forward pass
+                z1_hat, z2_hat = model(x1, x2)
+                # Compute loss
+                loss = criterion(z1_hat, z2_hat)
+                # Backward pass and optimize
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                train_loss += loss.item()
+            avg_train_loss = train_loss / len(train_dataloader)
 
-        for batch_idx, (x1, x2, _) in enumerate(dataloader):
-            x1, x2 = x1.to(device), x2.to(device)
-            # Forward pass
-            z1_hat, z2_hat = model(x1, x2)
-            # Compute loss
-            loss = criterion(z1_hat, z2_hat)
-            # Backward pass and optimize
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            # Validation step
+            model.eval()
+            val_loss = 0.0
+            with torch.no_grad():
+                for x1, x2, _ in val_dataloader:
+                    x1, x2 = x1.to(device), x2.to(device)
+                    z1_hat, z2_hat = model(x1, x2)
+                    val_loss += criterion(z1_hat, z2_hat).item()
+            avg_val_loss = val_loss / len(val_dataloader)
 
-            epoch_loss += loss.item()
-
-        avg_loss = epoch_loss / len(dataloader)
-        if (epoch + 1) % 10 == 0 or epoch == 0:
-            print(f"Epoch [{epoch + 1}/{epochs}] | Loss: {avg_loss:.4f}")
+            # Print performance
+            if (epoch + 1) % 10 == 0 or epoch == 0:
+                print(
+                    f"Epoch [{epoch + 1}/{epochs}] | Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f}"
+                )
+    except KeyboardInterrupt:
+        print("\nTraining interrupted. Exiting gracefully.")
 
 
 def evaluate_block_identifiability(model, dataloader, device):
@@ -67,6 +84,9 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
+    model_path = "./models/bimodal_encoder_l2.pth"
+    model_output_path = "./models/test.pth"
+
     # Setup Data
     dim_c, dim_s, dim_m = 4, 4, 2
     dim_total = dim_c + dim_s + dim_m
@@ -76,12 +96,12 @@ if __name__ == "__main__":
         dim_s=dim_s,
         dim_m=dim_m,
         causal=True,
-        pi=0.5,
+        pi=1.0,
         batch_size=8192,
     )
 
     # Setup model
-    encoder_layers = [dim_total, 128, 128, 128, 128, 128, dim_c]  # 7-layer mlp
+    encoder_layers = [dim_total, 128, 512, 512, 512, 512, 128, dim_c]  # 7-layer mlp
     criterion = SymmetricedInfoNCE(temperature=1.0)
     model = BimodalEncoders(
         layers1=encoder_layers, layers2=encoder_layers, criterion=criterion
@@ -95,11 +115,25 @@ if __name__ == "__main__":
     # print("Starting Training...")
     # trainer.fit(model, data)
 
+    # model.load_state_dict(torch.load(model_path))
+
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-    train_loader = data.train_dataloader()
-    test_loader = data.val_dataloader()
-    train_model(model, train_loader, optimizer, criterion, epochs=1000, device=device)
+    train_dataloader = data.train_dataloader()
+    val_dataloader = data.val_dataloader()
+    train_model(
+        model,
+        train_dataloader,
+        val_dataloader,
+        optimizer,
+        criterion,
+        epochs=500,
+        device=device,
+    )
 
     # Evaluate performance of trainer encoders
     print("Evaluating Block-Identifiability...")
     evaluate_block_identifiability(model, data.val_dataloader(), device=device)
+
+    # Save model
+    torch.save(model.state_dict(), model_output_path)
+    print(f"Saved model to {model_output_path}")

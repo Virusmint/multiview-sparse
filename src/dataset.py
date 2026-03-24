@@ -86,8 +86,8 @@ class NumericalDataset:
         # Concatenate latents and apply mixing functions
         z1 = torch.cat([self.c, self.s, self.m1], dim=1)
         z2 = torch.cat([self.c, self.s_tilde, self.m2], dim=1)
-        self.f1 = MixingFunction(self.dim_total, n_layers=4)
-        self.f2 = MixingFunction(self.dim_total, n_layers=4)
+        self.f1 = MixingFunction(self.dim_total, n_layers=1)
+        self.f2 = MixingFunction(self.dim_total, n_layers=1)
         self.x1 = self.f1(z1)
         self.x2 = self.f2(z2)
 
@@ -105,3 +105,7 @@ class NumericalDataset:
 
     def val_dataloader(self):
         return self.get_dataloader(train=False)
+
+
+class Multimodal3DIdent:
+    pass
