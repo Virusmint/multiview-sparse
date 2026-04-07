@@ -9,7 +9,7 @@ class MultiViewEncoders(nn.Module):
     """
 
     # NOTE: Each encoder has the same architecture, except for the input dimension. We could modify this to allow for different architectures per view if needed.
-    def __init__(self, view_encoders: List[nn.Module]) -> None:
+    def __init__(self, view_encoders: List) -> None:
         super().__init__()
         # Create a list of view-specific encoders
         self.encoders = nn.ModuleList(view_encoders)
@@ -26,6 +26,7 @@ class MLPEncoder(nn.Module):
     """
 
     def __init__(self, input_dim, hidden_dims: List[int], output_dim) -> None:
+        assert len(hidden_dims) > 0, "Must specify at least one hidden layer"
         super().__init__()
         layers = [input_dim] + hidden_dims + [output_dim]
         # Build modules
@@ -34,6 +35,8 @@ class MLPEncoder(nn.Module):
             modules.append(nn.Linear(layers[i], layers[i + 1]))
             if i < len(layers) - 2:
                 modules.append(nn.LeakyReLU(0.2))
+            # if i == len(layers) - 2:
+            #     modules.append(nn.Sigmoid())  # Final activation for latent space
         self.net = nn.Sequential(*modules)
 
     def forward(self, x):

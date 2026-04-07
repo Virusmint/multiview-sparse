@@ -39,17 +39,17 @@ class ProductLatentSpace:
 
 # -- Concrete Latent Subspaces --
 class GaussianSubspace(LatentSubspace):
-    def __init__(self, dim: int, mean=0.0, cov=None):
+    def __init__(self, dim: int, mean=0.0, covariance=None):
         super().__init__(dim)
         self.mean = mean
-        self.cov = (
-            cov if cov is not None else torch.eye(dim)
+        self.covariance = (
+            covariance if covariance is not None else torch.eye(dim)
         )  # Default to identity covariance
 
     def sample(self, batch_size: int, device="cpu"):
         dist = MultivariateNormal(
             torch.full((self.dim,), self.mean).to(device),
-            self.cov.to(device),
+            self.covariance.to(device),
         )
         return dist.sample((batch_size,))
 

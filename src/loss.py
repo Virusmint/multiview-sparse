@@ -2,6 +2,7 @@ import torch
 import torch.nn.functional as F
 import torch.nn as nn
 from typing import List, Callable
+from itertools import combinations
 
 
 class SymInfoNCELoss(nn.Module):
@@ -37,25 +38,25 @@ class SymInfoNCELoss(nn.Module):
         dtype = latents[0].dtype
 
         total_loss = torch.tensor(0.0, device=device, dtype=dtype)
-        pair_count = num_views * (num_views - 1) / 2  # Number of unique pairs
+        pairs = list(combinations(range(num_views), 2))  # Unique pairs of views
 
         # Create labels (diagonal matrix) once
         labels = torch.arange(batch_size).to(device)
 
         # Iterate through all unique pairs of views
-        for i in range(num_views):
-            for j in range(i + 1, num_views):
-                sim_matrix = self._get_similarity_matrix(latents[i], latents[j])
+        for i, j in pairs:
+            sim_matrix = self._get_similarity_matrix(latents[i], latents[j])
 
-                # Symmetric cross-entropy (View i -> j and View j -> i)
-                loss_ij = F.cross_entropy(sim_matrix, labels)
-                loss_ji = F.cross_entropy(sim_matrix.T, labels)
+            # Symmetric cross-entropy (View i -> j and View j -> i)
+            loss_ij = F.cross_entropy(sim_matrix, labels)
+            loss_ji = F.cross_entropy(sim_matrix.T, labels)
 
-                total_loss += (loss_ij + loss_ji) / 2
+            total_loss += (loss_ij + loss_ji) / 2
 
-        return total_loss / pair_count
+        return total_loss
 
 
+# BUG: Doesn't work
 class LpAlignEntropyLoss(nn.Module):
     """
     Special case of the general InfoNCE loss, where:
@@ -65,46 +66,58 @@ class LpAlignEntropyLoss(nn.Module):
     Implements Theorem 3.2: Content Alignment + Entropy Regularization.
     """
 
-    def __init__(self, p: int = 2, tau: float = 1.0, alpha: float = 0.5):
+    def __init__(self, p: int = 2, tau: float = 1.0, use_pow: bool = False, eps=1e-8):
         super().__init__()
         self.p = p
         self.tau = tau  # Temperature
-        self.alpha = alpha  # Weighting between alignment and entropy
+        self.use_pow = use_pow  # Use p-th power in distance calculations
+        self.eps = eps  # Numerical stability
 
     def forward(self, view_latents: List[torch.Tensor]) -> torch.Tensor:
-        """
-        Args:
-            view_latents: List of Tensors [z1, z2, ..., zV] each of shape (B, D)
-        """
         num_views = len(view_latents)
+        batch_size = view_latents[0].shape[0]
         device = view_latents[0].device
         dtype = view_latents[0].dtype
 
-        pos_loss = torch.tensor(0.0, device=device, dtype=dtype)
-        neg_loss = torch.tensor(0.0, device=device, dtype=dtype)
-        pair_count = num_views * (num_views - 1) / 2  # Number of unique pairs
+        # 1. Content Alignment (p-th power)
+        align_loss = torch.tensor(0.0, device=device, dtype=dtype)
+        pairs = list(combinations(range(num_views), 2))  # Unique pairs of views
 
-        # Iterate through all unique pairs of views
-        for i in range(num_views):
-            for j in range(i + 1, num_views):
-                # 1. Content Alignment: distance between the same sample in different views
-                dist_pos = torch.norm(
-                    view_latents[i] - view_latents[j], p=self.p, dim=-1
-                )  # (B,)
-                pos_loss += dist_pos.mean()
+        for i, j in pairs:
+            # Distance between corresponding samples in view i and view j
+            dist = torch.norm(
+                view_latents[i] - view_latents[j] + self.eps, p=self.p, dim=-1
+            )
+            if self.use_pow:
+                dist = dist.pow(self.p)
+            align_loss += dist.mean()
 
-                # 2. Entropy Regularization: approximate H(z) by pushing samples apart in the latent space
-                dist_matrix = torch.cdist(view_latents[i], view_latents[j], p=self.p)
-                neg_loss += self._logmeanexp(
-                    -dist_matrix / self.tau, dim=1
-                ).mean()  # Minimize log(mean(exp(-d))) to maximize entropy
+        align_loss /= len(pairs)
 
-        # Combine terms based on the alpha weight
-        total_loss = (self.alpha * pos_loss + (1 - self.alpha) * neg_loss) / pair_count
-        return total_loss
+        # 2. Entropy Regularization
+        entropy_loss = torch.tensor(0.0, device=device, dtype=dtype)
 
-    def _logmeanexp(self, x, dim):
-        # Numerically stable log(mean(exp(x)))
-        return torch.logsumexp(x, dim=dim) - torch.log(
-            torch.tensor(x.shape[dim], dtype=x.dtype, device=x.device)
-        )
+        for z in view_latents:
+            # Compute pairwise distance matrix for each view
+            dist = torch.norm(
+                z.unsqueeze(1) - z.unsqueeze(0) + self.eps, p=self.p, dim=-1
+            )
+            if self.use_pow:
+                dist = dist.pow(self.p)
+            # Exclude self-similarity by masking the diagonal
+            mask = torch.eye(batch_size, device=device, dtype=torch.bool)
+            neg_samples = dist[~mask].view(
+                batch_size, -1
+            )  # Shape: (batch_size, batch_size-1)
+            log_mean_exp = torch.logsumexp(-neg_samples / self.tau, dim=1) - torch.log(
+                torch.tensor(batch_size - 1, dtype=dtype, device=device)
+            )
+            entropy_loss += log_mean_exp.mean()
+
+        entropy_loss /= num_views
+
+        # print(
+        #     f"Alignment Loss: {align_loss.item():.4f}, Entropy Loss: {entropy_loss.item():.4f}"
+        # )
+
+        return align_loss - entropy_loss
