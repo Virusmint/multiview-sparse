@@ -7,7 +7,6 @@ from sklearn.metrics import r2_score
 from dataset import NumericalDataset
 from models import BimodalEncoders
 from loss import SymmetricedInfoNCE
-from trainer import Trainer
 
 
 def train_model(
