@@ -1,17 +1,16 @@
 import sys
 import os
 import torch
+import torch.nn.functional as F
 import numpy as np
 from torch.utils.data import DataLoader
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import r2_score
-import numpy as np
 
 from tqdm import tqdm
-from typing import Dict
+from typing import Dict, List, Tuple
 
 # Add src to path so we can import our modules
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
@@ -19,19 +18,20 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "s
 from src.numerical_experiment.dataset import NumericalDataset
 from src.numerical_experiment.latent_space import ProductLatentSpace, GaussianSubspace
 from src.numerical_experiment.mixer import MultiViewMixer
-from src.loss import LpAlignEntropyLoss, SymInfoNCELoss
+from src.loss import SparseInfoNCELoss, SymInfoNCELoss
 from src.encoders import MultiViewEncoders, MLPEncoder
+from src.utils import dot_product, neg_l2_dist, cosine_sim
 
 
 def train_epoch(
-    encoder: MultiViewEncoders,
+    encoders: MultiViewEncoders,
     data_loader: DataLoader,
     optimizer: torch.optim.Optimizer,
     criterion: torch.nn.Module,
     device: torch.device,
-    steps: int = 100,
-) -> float:
-    encoder.train()
+    steps: int = 100,  # Number of gradient steps per epoch
+) -> Tuple[float, List[int]]:
+    encoders.train()
     epoch_loss = 0.0
     data_iter = iter(data_loader)
     for _ in range(steps):
@@ -39,13 +39,17 @@ def train_epoch(
         x_views = [x.to(device) for x in x_views]
 
         optimizer.zero_grad()
-        z_hats = encoder(x_views)
+        z_hats = encoders(x_views)  # Get representations from all views
         loss = criterion(z_hats)
 
+        # Optimize
         loss.backward()
         optimizer.step()
+
+        # Logging
         epoch_loss += loss.item()
-    return epoch_loss / steps
+    active_indices = encoders.get_active_indices()
+    return epoch_loss / steps, active_indices
 
 
 def evaluate(
@@ -65,7 +69,7 @@ def evaluate(
             x_views = [x.to(device) for x in x_views]
             # Get representations from all views
             z_hats = encoder(x_views)
-            # Paper style: Use the content from one view or average them
+            # Use the content from one view or average them
             # Let's average them as a proxy for the 'shared' content
             z_hat_avg = torch.stack(z_hats, dim=0).mean(dim=0)
             all_z_hat.append(z_hat_avg.cpu().numpy())
@@ -99,46 +103,77 @@ def evaluate(
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # 1. SETUP WORLD: 6 dimensions (3 independent, 3 in a causal chain)
-    num_latents = 6
-    cov = torch.eye(num_latents)
-    latent_world = ProductLatentSpace(
+    # 1. SETUP LATENT SPACE
+    num_latents = 7
+    cov = torch.eye(num_latents)  # Independent latents with unit variance
+    latent_space = ProductLatentSpace(
         [GaussianSubspace(dim=num_latents, covariance=cov)]
     )
 
-    # 2. SETUP PHYSICS: 4 Views with specific factor overlaps
-    view_configs = [[0, 1, 2, 3, 4], [0, 1, 2, 4, 5], [0, 1, 2, 3, 5], [0, 1, 3, 4, 5]]
+    # 2. SETUP PHYSICS: Indices 0 and 1 are content
+    view_configs = [
+        [0, 1, 2],
+        [0, 1, 3],
+        [0, 1, 4],
+        [0, 1, 5],
+        [0, 1, 6],
+        # [0, 1, 7],
+        # [0, 1, 8],
+        # [0, 1, 9],
+    ]
     mixer = MultiViewMixer(view_configs)
 
     # 3. SETUP DATA
-    dataset = NumericalDataset(latent_world, mixer, batch_size=4096)
-    loader = DataLoader(dataset, batch_size=None)  # batch_size=None for IterableDataset
+    dataset = NumericalDataset(latent_space, mixer, batch_size=4096)
+    data_loader = DataLoader(
+        dataset, batch_size=None
+    )  # batch_size=None for IterableDataset
 
     # 4. SETUP MODEL & OPTIMIZER
+    use_sparsity = True
+    estimated_dim = 6  # Overestimate the latent dimension to test if the model can learn to ignore irrelevant dimensions
     view_encoders = [
         MLPEncoder(
             input_dim=len(S_k),
-            hidden_dims=[128, 128, 128, 128, 128],
-            output_dim=2,
+            hidden_dims=[128, 128],
+            output_dim=estimated_dim,
         )
         for S_k in view_configs
     ]
-    model = MultiViewEncoders(view_encoders).to(device)
+    model = MultiViewEncoders(view_encoders, use_sparsity=use_sparsity).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
+    # 5. SETUP LOSS
+    lambda_ = 0.1  # Regularization strength for sparsity
     # criterion = LpAlignEntropyLoss(p=2, tau=1.0)
-    def negative_l2_similarity(x, y, dim):
-        return -torch.norm(x - y, dim=dim)
+    # criterion = SymInfoNCELoss(temperature=1.0, sim_metric=cosine_sim)
+    criterion = SparseInfoNCELoss(
+        encoders=model, lambda_=lambda_, temperature=1.0, sim_metric=cosine_sim
+    )
 
-    criterion = SymInfoNCELoss(temperature=1.0, sim_metric=negative_l2_similarity)
+    # 6. TRAINING LOOP
+    warmup_epochs = 0  # Number of epochs to train without sparsity penalty
 
-    # 5. TRAINING LOOP
     print(f"Starting experiment on {device}...")
-    for epoch in tqdm(range(1, 201), desc="Training"):
-        loss = train_epoch(model, loader, optimizer, criterion, device)
+    pbar = tqdm(range(1, 201), desc="Training")
+    try:
+        for epoch in pbar:
+            criterion.set_sparsity(
+                epoch < warmup_epochs
+            )  # Disable sparsity penalty during warmup
 
-        if epoch % 20 == 0 or epoch == 1:
-            r2 = evaluate(model, loader, device)
-            print(f"Epoch {epoch:03d} | Loss: {loss:.4f} | Block R^2: {r2}")
+            loss, active_dims = train_epoch(
+                model, data_loader, optimizer, criterion, device
+            )
 
-    torch.save(model.state_dict(), "scripts/numerical_model.pth")
+            pbar.set_postfix(
+                {"loss": f"{loss:.4f}", "dims": f"{active_dims}/{estimated_dim}"}
+            )
+            if epoch % 20 == 0 or epoch == 1:
+                r2 = evaluate(model, data_loader, device)
+                print(f"Epoch {epoch:03d} |  Block R^2: {r2}")
+
+    except KeyboardInterrupt:
+        print("Training interrupted. Saving model...")
+    finally:
+        torch.save(model.state_dict(), "checkpoint/numerical_model.pth")

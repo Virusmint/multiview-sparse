@@ -1,23 +1,52 @@
 import torch
 import torch.nn as nn
 from typing import List
+from src.hard_concrete import HardConcreteGate
 
 
 class MultiViewEncoders(nn.Module):
     """
     Encodes multiple views into a shared latent space.
+
+    If use_sparsity is True, applies a shared hard concrete gate to encourage learning a common subset of latent factors across views.
+    Otherwise, the true content size is assumed to be given by the output dimension of the encoders.
     """
 
     # NOTE: Each encoder has the same architecture, except for the input dimension. We could modify this to allow for different architectures per view if needed.
-    def __init__(self, view_encoders: List) -> None:
+    def __init__(self, view_encoders: List, use_sparsity: bool = False):
         super().__init__()
         # Create a list of view-specific encoders
         self.encoders = nn.ModuleList(view_encoders)
+        self.use_sparsity = use_sparsity
+        if use_sparsity:
+            # Single gate shared across all views to encourage learning a common subset of latent factors
+            self.gates = HardConcreteGate(dim=view_encoders[0].net[-1].out_features)
+        else:
+            self.gates = nn.Identity()  # No gating if not using sparsity
 
     def forward(self, views: List[torch.Tensor]) -> List[torch.Tensor]:
         # Encodes each view into latent representation
         latents = [enc(x) for enc, x in zip(self.encoders, views)]
-        return latents
+        sparse_latents = [self.gates(latent) for latent in latents]
+        return sparse_latents
+
+    def get_l0_penalty(self) -> torch.Tensor:
+        if self.use_sparsity:
+            return self.gates.get_l0_penalty()  # type: ignore[attr-defined]
+        return torch.tensor(
+            0.0, device=next(self.parameters()).device
+        )  # No penalty if not using sparsity
+
+    def get_active_indices(self) -> List[int]:
+        """
+        Returns the indices of the active latent factors based on the hard concrete gates.
+        If not using sparsity, returns all factors as active.
+        """
+        if self.use_sparsity:
+            return self.gates.get_active_indices()  # type: ignore[attr-defined]
+        return list(
+            range(self.encoders[0].net[-1].out_features)
+        )  # All factors are active
 
 
 class MLPEncoder(nn.Module):
@@ -29,6 +58,7 @@ class MLPEncoder(nn.Module):
         assert len(hidden_dims) > 0, "Must specify at least one hidden layer"
         super().__init__()
         layers = [input_dim] + hidden_dims + [output_dim]
+
         # Build modules
         modules = []
         for i in range(len(layers) - 1):
@@ -37,6 +67,7 @@ class MLPEncoder(nn.Module):
                 modules.append(nn.LeakyReLU(0.2))
             # if i == len(layers) - 2:
             #     modules.append(nn.Sigmoid())  # Final activation for latent space
+
         self.net = nn.Sequential(*modules)
 
     def forward(self, x):
