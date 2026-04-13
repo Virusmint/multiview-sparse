@@ -13,4 +13,4 @@ Currently our work is based on Yao's paper and their supporting [Github repo](ht
 ### TODO
 
 - [ ] Move all the experiment configuration to a yaml file instead of hardcoding in the code.
-- [ ] Write plotting logic for hard concrete gate values.
+- [ ] Implement multimodal experiments
