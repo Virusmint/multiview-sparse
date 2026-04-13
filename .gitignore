@@ -4,7 +4,6 @@ venv/
 .venv/
 env/
 build/
-figures/
 
 .DS_Store
 *.synctex.gz
