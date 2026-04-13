@@ -1,7 +1,7 @@
 import sys
 import os
 import torch
-import torch.nn.functional as F
+from torch.distributions import Wishart
 import numpy as np
 from torch.utils.data import DataLoader
 from sklearn.linear_model import LinearRegression
@@ -13,14 +13,15 @@ from tqdm import tqdm
 from typing import Dict, List, Tuple
 
 # Add src to path so we can import our modules
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.numerical_experiment.dataset import NumericalDataset
 from src.numerical_experiment.latent_space import ProductLatentSpace, GaussianSubspace
 from src.numerical_experiment.mixer import MultiViewMixer
 from src.loss import SparseInfoNCELoss, SymInfoNCELoss
 from src.encoders import MultiViewEncoders, MLPEncoder
-from src.utils import dot_product, neg_l2_dist, cosine_sim
+from src.utils.sim_metric import cosine_sim
+from src.utils.plotting import plot_gate_history
 
 
 def train_epoch(
@@ -48,8 +49,10 @@ def train_epoch(
 
         # Logging
         epoch_loss += loss.item()
-    active_indices = encoders.get_active_indices()
-    return epoch_loss / steps, active_indices
+    gate_values = (
+        encoders.get_gate_values().cpu().numpy().tolist()
+    )  # Get current gate values for logging
+    return epoch_loss / steps, gate_values
 
 
 def evaluate(
@@ -103,24 +106,25 @@ def evaluate(
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # 1. SETUP LATENT SPACE
-    num_latents = 7
-    cov = torch.eye(num_latents)  # Independent latents with unit variance
-    latent_space = ProductLatentSpace(
-        [GaussianSubspace(dim=num_latents, covariance=cov)]
-    )
-
-    # 2. SETUP PHYSICS: Indices 0 and 1 are content
+    # 1. SETUP PHYSICS: Indices 0 and 1 are content
     view_configs = [
         [0, 1, 2],
         [0, 1, 3],
         [0, 1, 4],
         [0, 1, 5],
         [0, 1, 6],
-        # [0, 1, 7],
-        # [0, 1, 8],
-        # [0, 1, 9],
+        [0, 1, 7],
+        [0, 1, 8],
+        [0, 1, 9],
     ]
+    num_latents = len(set().union(*view_configs))  # Num unique latents
+    cov = Wishart(
+        df=num_latents + 1, covariance_matrix=torch.eye(num_latents)
+    ).sample()  # Random covariance
+    # cov = torch.eye(num_latents)  # Independent latents for simplicity
+    latent_space = ProductLatentSpace(
+        [GaussianSubspace(dim=num_latents, covariance=cov)]
+    )
     mixer = MultiViewMixer(view_configs)
 
     # 3. SETUP DATA
@@ -131,7 +135,7 @@ if __name__ == "__main__":
 
     # 4. SETUP MODEL & OPTIMIZER
     use_sparsity = True
-    estimated_dim = 6  # Overestimate the latent dimension to test if the model can learn to ignore irrelevant dimensions
+    estimated_dim = 6  # Overestimate the latent dimension to test if the model prune the irrelevant dimensions
     view_encoders = [
         MLPEncoder(
             input_dim=len(S_k),
@@ -148,27 +152,33 @@ if __name__ == "__main__":
     # criterion = LpAlignEntropyLoss(p=2, tau=1.0)
     # criterion = SymInfoNCELoss(temperature=1.0, sim_metric=cosine_sim)
     criterion = SparseInfoNCELoss(
-        encoders=model, lambda_=lambda_, temperature=1.0, sim_metric=cosine_sim
+        encoders=model, lambda_=lambda_, temperature=2.0, sim_metric=cosine_sim
     )
 
     # 6. TRAINING LOOP
     warmup_epochs = 0  # Number of epochs to train without sparsity penalty
+    num_epochs = 50
+    gate_history = np.zeros((num_epochs, estimated_dim))
 
     print(f"Starting experiment on {device}...")
-    pbar = tqdm(range(1, 201), desc="Training")
+    pbar = tqdm(range(1, num_epochs + 1), desc="Training")
     try:
         for epoch in pbar:
             criterion.set_sparsity(
                 epoch < warmup_epochs
             )  # Disable sparsity penalty during warmup
 
-            loss, active_dims = train_epoch(
+            loss, gate_values = train_epoch(
                 model, data_loader, optimizer, criterion, device
             )
 
             pbar.set_postfix(
-                {"loss": f"{loss:.4f}", "dims": f"{active_dims}/{estimated_dim}"}
+                {
+                    "loss": f"{loss:.4f}",
+                    "gate values": f"{gate_values}",
+                }
             )
+            gate_history[epoch - 1] = gate_values
             if epoch % 20 == 0 or epoch == 1:
                 r2 = evaluate(model, data_loader, device)
                 print(f"Epoch {epoch:03d} |  Block R^2: {r2}")
@@ -177,3 +187,8 @@ if __name__ == "__main__":
         print("Training interrupted. Saving model...")
     finally:
         torch.save(model.state_dict(), "checkpoint/numerical_model.pth")
+        plot_gate_history(
+            gate_history,
+            save_path="figures/numerical_gate_history_heatmap.png",
+            use_heatmap=True,
+        )

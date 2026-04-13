@@ -20,33 +20,32 @@ class MultiViewEncoders(nn.Module):
         self.use_sparsity = use_sparsity
         if use_sparsity:
             # Single gate shared across all views to encourage learning a common subset of latent factors
-            self.gates = HardConcreteGate(dim=view_encoders[0].net[-1].out_features)
+            self.gate = HardConcreteGate(dim=view_encoders[0].net[-1].out_features)
         else:
-            self.gates = nn.Identity()  # No gating if not using sparsity
+            self.gate = nn.Identity()  # No gating if not using sparsity
 
     def forward(self, views: List[torch.Tensor]) -> List[torch.Tensor]:
         # Encodes each view into latent representation
         latents = [enc(x) for enc, x in zip(self.encoders, views)]
-        sparse_latents = [self.gates(latent) for latent in latents]
+        sparse_latents = [self.gate(latent) for latent in latents]
         return sparse_latents
 
     def get_l0_penalty(self) -> torch.Tensor:
         if self.use_sparsity:
-            return self.gates.get_l0_penalty()  # type: ignore[attr-defined]
+            return self.gate.get_l0_penalty()  # type: ignore[attr-defined]
         return torch.tensor(
             0.0, device=next(self.parameters()).device
         )  # No penalty if not using sparsity
 
-    def get_active_indices(self) -> List[int]:
+    def get_gate_values(self) -> torch.Tensor:
         """
-        Returns the indices of the active latent factors based on the hard concrete gates.
-        If not using sparsity, returns all factors as active.
+        Returns the current values of the hard concrete gate (deterministic mask)
         """
         if self.use_sparsity:
-            return self.gates.get_active_indices()  # type: ignore[attr-defined]
-        return list(
-            range(self.encoders[0].net[-1].out_features)
-        )  # All factors are active
+            return self.gate.get_values()  # type: ignore[attr-defined]
+        # Fallback: If not using sparsity, all dimensions are active
+        out_dim = self.encoders[0].net[-1].out_features
+        return torch.ones(out_dim, device=next(self.parameters()).device)
 
 
 class MLPEncoder(nn.Module):

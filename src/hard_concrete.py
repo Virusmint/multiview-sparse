@@ -12,12 +12,16 @@ class HardConcreteGate(nn.Module):
         beta: float = 0.66,
         gamma: float = -0.1,
         zeta: float = 1.1,
+        decay_rate: float = 0.96,
+        min_beta: float = 0.1,
     ):
         super().__init__()
         self.dim = dim
         self.beta = beta
         self.gamma = gamma
         self.zeta = zeta
+        self.decay_rate = decay_rate
+        self.min_beta = min_beta
 
         # We parameterize log_alpha.
         # Initializing it so that the initial gate values are slightly open.
@@ -42,6 +46,12 @@ class HardConcreteGate(nn.Module):
             z = torch.clamp(s_bar, min=0, max=1)
         return x * z  # Apply the gate to the input
 
+    def anneal_temperature(self):
+        """
+        Anneals the beta parameter to encourage harder gating over time.
+        """
+        self.beta = max(self.beta * self.decay_rate, self.min_beta)
+
     def get_l0_penalty(self) -> torch.Tensor:
         """
         Computes the expected L0 norm of the gates for sparsity regularization.
@@ -54,12 +64,12 @@ class HardConcreteGate(nn.Module):
         return p_active.sum()  # Sum over all gates for total expected L0 norm
 
     @torch.no_grad()
-    def get_active_indices(self) -> torch.Tensor:
+    def get_values(self) -> torch.Tensor:
         """
-        Return non-zero gate indices based on the deterministic gate values (used during evaluation).
+        Computes the deterministic gate values (z) for evaluation.
+        z = clamp(sigmoid(log_alpha) * (zeta - gamma) + gamma, 0, 1)
         """
         s = torch.sigmoid(self.log_alpha)
         s_bar = s * (self.zeta - self.gamma) + self.gamma
         z = torch.clamp(s_bar, min=0, max=1)
-        active_indices = (z > 0).nonzero(as_tuple=True)[0]
-        return active_indices
+        return z

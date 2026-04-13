@@ -2,8 +2,7 @@ import torch
 import torch.nn as nn
 from typing import List
 
-# -- ONLY FOR NUMERICAL EXPERIMENTS --
-# Mixing functions for the multi-view data-generating process.
+"""Mixing functions for the multi-view data-generating process."""
 
 
 class MixingFunction(nn.Module):
@@ -56,11 +55,3 @@ class MultiViewMixer(nn.Module):
             x_view = self.mixers[i](z_view)  # Apply the mixing function for this view
             observations.append(x_view)
         return observations
-
-
-def generate_covariance(dim):
-    """
-    Generate a random symmetric positive-definite matrix of size dim to be used as covariance matrix
-    """
-    A = torch.randn(dim, dim)
-    return torch.mm(A, A.t()) + torch.eye(dim) * 1e-3
