@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from typing import List
+from torchvision.models import resnet18
 from src.hard_concrete import HardConcreteGate
 
 
@@ -18,11 +19,29 @@ class MultiViewEncoders(nn.Module):
         # Create a list of view-specific encoders
         self.encoders = nn.ModuleList(view_encoders)
         self.use_sparsity = use_sparsity
+        self.output_dim = self._get_encoder_output_dim(self.encoders[0])
         if use_sparsity:
             # Single gate shared across all views to encourage learning a common subset of latent factors
-            self.gate = HardConcreteGate(dim=view_encoders[0].net[-1].out_features)
+            self.gate = HardConcreteGate(dim=self.output_dim)
         else:
             self.gate = nn.Identity()  # No gating if not using sparsity
+
+    @staticmethod
+    def _get_encoder_output_dim(encoder: nn.Module) -> int:
+        # Most local encoders expose a `net` sequential.
+        if hasattr(encoder, "net") and isinstance(encoder.net, nn.Sequential):
+            for module in reversed(encoder.net):
+                if hasattr(module, "out_features"):
+                    return int(module.out_features)
+        # Fallback for torchvision-style and custom encoders exposing a final linear head.
+        if hasattr(encoder, "linear") and hasattr(encoder.linear, "out_features"):
+            return int(encoder.linear.out_features)
+        if hasattr(encoder, "fc") and hasattr(encoder.fc, "out_features"):
+            return int(encoder.fc.out_features)
+        raise ValueError(
+            "Could not infer encoder output dimension. "
+            "Expected one of: encoder.net[-1].out_features, encoder.linear.out_features, or encoder.fc.out_features."
+        )
 
     def forward(self, views: List[torch.Tensor]) -> List[torch.Tensor]:
         # Encodes each view into latent representation
@@ -44,8 +63,7 @@ class MultiViewEncoders(nn.Module):
         if self.use_sparsity:
             return self.gate.get_values()  # type: ignore[attr-defined]
         # Fallback: If not using sparsity, all dimensions are active
-        out_dim = self.encoders[0].net[-1].out_features
-        return torch.ones(out_dim, device=next(self.parameters()).device)
+        return torch.ones(self.output_dim, device=next(self.parameters()).device)
 
 
 class MLPEncoder(nn.Module):
@@ -97,3 +115,60 @@ class ConvEncoder(nn.Module):
         x = self.conv_net(x)
         x = x.view(x.size(0), -1)  # Flatten
         return self.fc(x)
+
+
+class ImageEncoderResNet(nn.Module):
+    """
+    Reference-style image encoder:
+    ResNet18 -> LeakyReLU -> Linear(out_dim).
+    """
+
+    def __init__(self, output_dim: int, hidden_size: int = 100) -> None:
+        super().__init__()
+        self.net = nn.Sequential(
+            resnet18(num_classes=hidden_size),
+            nn.LeakyReLU(),
+            nn.Linear(hidden_size, output_dim),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.net(x)
+
+
+class TextEncoder2D(nn.Module):
+    """
+    Reference-style 2D ConvNet text encoder used for multimodal image/text experiments.
+    """
+
+    def __init__(
+        self,
+        input_size: int,
+        output_size: int,
+        sequence_length: int,
+        embedding_dim: int = 128,
+        fbase: int = 25,
+    ):
+        super().__init__()
+        if sequence_length < 24 or sequence_length > 31:
+            raise ValueError("TextEncoder2D expects sequence_length between 24 and 31")
+        self.fbase = fbase
+        self.embedding = nn.Linear(input_size, embedding_dim)
+        self.convnet = nn.Sequential(
+            nn.Conv2d(1, fbase, 4, 2, 1, bias=True),
+            nn.BatchNorm2d(fbase),
+            nn.ReLU(True),
+            nn.Conv2d(fbase, fbase * 2, 4, 2, 1, bias=True),
+            nn.BatchNorm2d(fbase * 2),
+            nn.ReLU(True),
+            nn.Conv2d(fbase * 2, fbase * 4, 4, 2, 1, bias=True),
+            nn.BatchNorm2d(fbase * 4),
+            nn.ReLU(True),
+        )
+        self.ldim = fbase * 4 * 3 * 16
+        self.linear = nn.Linear(self.ldim, output_size)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.embedding(x).unsqueeze(1)
+        x = self.convnet(x)
+        x = x.view(-1, self.ldim)
+        return self.linear(x)
