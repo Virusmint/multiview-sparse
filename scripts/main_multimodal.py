@@ -1,5 +1,4 @@
 import argparse
-import importlib.util
 import os
 import random
 import sys
@@ -19,21 +18,7 @@ from src.encoders import ImageEncoderResNet, MultiViewEncoders, TextEncoder2D
 from src.loss import SparseInfoNCELoss, SymInfoNCELoss
 from src.utils.plotting import plot_gate_history
 from src.utils.sim_metric import cosine_sim
-
-
-def load_external_multimodal_dataset_class():
-    external_path = (
-        Path(__file__).resolve().parents[1]
-        / "external"
-        / "multimodal-repo"
-        / "datasets.py"
-    )
-    spec = importlib.util.spec_from_file_location("external_multimodal_datasets", external_path)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"Could not load dataset module from `{external_path}`.")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.Multimodal3DIdent
+from src.multimodal_experiment.datasets import Multimodal3DIdent
 
 
 def set_seed(seed: int) -> None:
@@ -43,7 +28,9 @@ def set_seed(seed: int) -> None:
     torch.cuda.manual_seed_all(seed)
 
 
-def to_views(batch: Dict[str, torch.Tensor], device: torch.device) -> List[torch.Tensor]:
+def to_views(
+    batch: Dict[str, torch.Tensor], device: torch.device
+) -> List[torch.Tensor]:
     return [batch["image"].to(device), batch["text"].to(device)]
 
 
@@ -79,7 +66,9 @@ def train_epoch(
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Multimodal M3DI training with hard-concrete gating.")
+    parser = argparse.ArgumentParser(
+        description="Multimodal M3DI training with hard-concrete gating."
+    )
     parser.add_argument("--data-root", type=str, required=True)
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--steps-per-epoch", type=int, default=100)
@@ -94,7 +83,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--no-sparsity", action="store_true")
     parser.add_argument("--no-cuda", action="store_true")
-    parser.add_argument("--checkpoint-path", type=str, default="checkpoint/multimodal_model.pth")
+    parser.add_argument(
+        "--checkpoint-path", type=str, default="checkpoint/multimodal_model.pth"
+    )
     parser.add_argument(
         "--gate-plot-path",
         type=str,
@@ -112,8 +103,6 @@ def main() -> None:
         device = torch.device("cuda")
     else:
         device = torch.device("cpu")
-
-    Multimodal3DIdent = load_external_multimodal_dataset_class()
 
     mean_per_channel = [0.4327, 0.2689, 0.2839]
     std_per_channel = [0.1201, 0.1457, 0.1082]
@@ -135,11 +124,11 @@ def main() -> None:
 
     image_encoder = ImageEncoderResNet(
         output_dim=args.estimated_dim,
-        hidden_size=args.hidden_size,
+        hidden_dim=args.hidden_size,
     )
     text_encoder = TextEncoder2D(
-        input_size=train_dataset.vocab_size,
-        output_size=args.estimated_dim,
+        input_dim=train_dataset.vocab_size,
+        output_dim=args.estimated_dim,
         sequence_length=train_dataset.max_sequence_length,
     )
 

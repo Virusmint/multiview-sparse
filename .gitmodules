@@ -1,3 +1,3 @@
-[submodule "external/multimodal-repo"]
-	path = external/multimodal-repo
+[submodule "src/multimodal_experiment"]
+	path = src/multimodal_experiment
 	url = https://github.com/imantdaunhawer/multimodal-contrastive-learning
