@@ -1,8 +1,19 @@
 import torch
 import torch.nn as nn
-from typing import List
 from torchvision.models import resnet18
+from typing import List
+from abc import ABC, abstractmethod
 from src.hard_concrete import HardConcreteGate
+
+
+class ViewEncoder(nn.Module, ABC):
+    """
+    Base abstract class for view encoder. Can be extended to implement specific architectures for different modalities.
+    """
+
+    @abstractmethod
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        pass
 
 
 class MultiViewEncoders(nn.Module):
@@ -13,8 +24,9 @@ class MultiViewEncoders(nn.Module):
     Otherwise, the true content size is assumed to be given by the output dimension of the encoders.
     """
 
-    # NOTE: Each encoder has the same architecture, except for the input dimension. We could modify this to allow for different architectures per view if needed.
-    def __init__(self, view_encoders: List, use_sparsity: bool = False):
+    # NOTE: Each encoder has the same architecture, except for the input dimension.
+    # We could modify this to allow for different architectures per view if needed.
+    def __init__(self, view_encoders: List[ViewEncoder], use_sparsity: bool = False):
         super().__init__()
         # Create a list of view-specific encoders
         self.encoders = nn.ModuleList(view_encoders)
@@ -66,7 +78,7 @@ class MultiViewEncoders(nn.Module):
         return torch.ones(self.output_dim, device=next(self.parameters()).device)
 
 
-class MLPEncoder(nn.Module):
+class MLPEncoder(ViewEncoder):
     """
     MLP encoder architecture for views.
     """
@@ -91,59 +103,33 @@ class MLPEncoder(nn.Module):
         return self.net(x)
 
 
-class ConvEncoder(nn.Module):
-    """
-    Convolutional encoder architecture for images.
-    """
-
-    def __init__(self, input_channels, hidden_dims: List[int], output_dim) -> None:
-        super().__init__()
-        layers = []
-        in_channels = input_channels
-        for hidden_dim in hidden_dims:
-            layers.append(
-                nn.Conv2d(in_channels, hidden_dim, kernel_size=3, stride=1, padding=1)
-            )
-            layers.append(nn.LeakyReLU(0.2))
-            in_channels = hidden_dim
-        self.conv_net = nn.Sequential(*layers)
-        self.fc = nn.Linear(
-            in_channels * 8 * 8, output_dim
-        )  # Assuming input images are 32x32
-
-    def forward(self, x):
-        x = self.conv_net(x)
-        x = x.view(x.size(0), -1)  # Flatten
-        return self.fc(x)
-
-
-class ImageEncoderResNet(nn.Module):
+class ImageEncoderResNet(ViewEncoder):
     """
     Reference-style image encoder:
     ResNet18 -> LeakyReLU -> Linear(out_dim).
     """
 
-    def __init__(self, output_dim: int, hidden_size: int = 100) -> None:
+    def __init__(self, output_dim: int, hidden_dim: int = 100) -> None:
         super().__init__()
         self.net = nn.Sequential(
-            resnet18(num_classes=hidden_size),
+            resnet18(num_classes=hidden_dim),
             nn.LeakyReLU(),
-            nn.Linear(hidden_size, output_dim),
+            nn.Linear(hidden_dim, output_dim),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.net(x)
 
 
-class TextEncoder2D(nn.Module):
+class TextEncoder2D(ViewEncoder):
     """
     Reference-style 2D ConvNet text encoder used for multimodal image/text experiments.
     """
 
     def __init__(
         self,
-        input_size: int,
-        output_size: int,
+        input_dim: int,
+        output_dim: int,
         sequence_length: int,
         embedding_dim: int = 128,
         fbase: int = 25,
@@ -152,7 +138,7 @@ class TextEncoder2D(nn.Module):
         if sequence_length < 24 or sequence_length > 31:
             raise ValueError("TextEncoder2D expects sequence_length between 24 and 31")
         self.fbase = fbase
-        self.embedding = nn.Linear(input_size, embedding_dim)
+        self.embedding = nn.Linear(input_dim, embedding_dim)
         self.convnet = nn.Sequential(
             nn.Conv2d(1, fbase, 4, 2, 1, bias=True),
             nn.BatchNorm2d(fbase),
@@ -165,7 +151,7 @@ class TextEncoder2D(nn.Module):
             nn.ReLU(True),
         )
         self.ldim = fbase * 4 * 3 * 16
-        self.linear = nn.Linear(self.ldim, output_size)
+        self.linear = nn.Linear(self.ldim, output_dim)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.embedding(x).unsqueeze(1)
