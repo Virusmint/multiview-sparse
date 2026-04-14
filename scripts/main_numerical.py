@@ -20,7 +20,7 @@ from src.numerical_experiment.latent_space import ProductLatentSpace, GaussianSu
 from src.numerical_experiment.mixer import MultiViewMixer
 from src.loss import SparseInfoNCELoss, SymInfoNCELoss
 from src.encoders import MultiViewEncoders, MLPEncoder
-from src.utils.sim_metric import cosine_sim
+from src.metrics import cosine_sim
 from src.utils.plotting import plot_gate_history
 
 

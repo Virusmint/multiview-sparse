@@ -17,7 +17,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from src.encoders import ImageEncoderResNet, MultiViewEncoders, TextEncoder2D
 from src.loss import SparseInfoNCELoss, SymInfoNCELoss
 from src.utils.plotting import plot_gate_history
-from src.utils.sim_metric import cosine_sim
+from src.metrics import cosine_sim
 from src.multimodal_experiment.datasets import Multimodal3DIdent
 
 
