@@ -20,23 +20,18 @@ class MultiViewEncoders(nn.Module):
     """
     Encodes multiple views into a shared latent space.
 
-    If use_sparsity is True, applies a shared hard concrete gate to encourage learning a common subset of latent factors across views.
+    Applies a shared hard concrete gate to encourage learning a common subset of latent factors across views.
     Otherwise, the true content size is assumed to be given by the output dimension of the encoders.
     """
 
     # NOTE: Each encoder has the same architecture, except for the input dimension.
     # We could modify this to allow for different architectures per view if needed.
-    def __init__(self, view_encoders: List[ViewEncoder], use_sparsity: bool = False):
+    def __init__(self, view_encoders: List[ViewEncoder]):
         super().__init__()
         # Create a list of view-specific encoders
         self.encoders = nn.ModuleList(view_encoders)
-        self.use_sparsity = use_sparsity
         self.output_dim = self._get_encoder_output_dim(self.encoders[0])
-        if use_sparsity:
-            # Single gate shared across all views to encourage learning a common subset of latent factors
-            self.gate = HardConcreteGate(dim=self.output_dim)
-        else:
-            self.gate = nn.Identity()  # No gating if not using sparsity
+        self.gate = HardConcreteGate(dim=self.output_dim)
 
     @staticmethod
     def _get_encoder_output_dim(encoder: nn.Module) -> int:
@@ -62,20 +57,16 @@ class MultiViewEncoders(nn.Module):
         return sparse_latents
 
     def get_l0_penalty(self) -> torch.Tensor:
-        if self.use_sparsity:
-            return self.gate.get_l0_penalty()  # type: ignore[attr-defined]
-        return torch.tensor(
-            0.0, device=next(self.parameters()).device
-        )  # No penalty if not using sparsity
+        return self.gate.get_l0_penalty()  # type: ignore[attr-defined]
 
     def get_gate_values(self) -> torch.Tensor:
         """
         Returns the current values of the hard concrete gate (deterministic mask)
         """
-        if self.use_sparsity:
-            return self.gate.get_values()  # type: ignore[attr-defined]
-        # Fallback: If not using sparsity, all dimensions are active
-        return torch.ones(self.output_dim, device=next(self.parameters()).device)
+        return self.gate.get_values()  # type: ignore[attr-defined]
+
+    def anneal_temperature(self):
+        self.gate.anneal_temperature()  # type: ignore[attr-defined]
 
 
 class MLPEncoder(ViewEncoder):

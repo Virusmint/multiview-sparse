@@ -18,7 +18,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from src.numerical_experiment.dataset import NumericalDataset
 from src.numerical_experiment.latent_space import ProductLatentSpace, GaussianSubspace
 from src.numerical_experiment.mixer import MultiViewMixer
-from src.loss import SparseInfoNCELoss, SymInfoNCELoss
+from src.loss import SparseInfoNCELoss
 from src.encoders import MultiViewEncoders, MLPEncoder
 from src.metrics import cosine_sim
 from src.utils.plotting import plot_gate_history
@@ -134,7 +134,6 @@ if __name__ == "__main__":
     )  # batch_size=None for IterableDataset
 
     # 4. SETUP MODEL & OPTIMIZER
-    use_sparsity = True
     estimated_dim = 6  # Overestimate the latent dimension to test if the model prune the irrelevant dimensions
     view_encoders = [
         MLPEncoder(
@@ -144,7 +143,7 @@ if __name__ == "__main__":
         )
         for S_k in view_configs
     ]
-    model = MultiViewEncoders(view_encoders, use_sparsity=use_sparsity).to(device)
+    model = MultiViewEncoders(view_encoders).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
     # 5. SETUP LOSS
@@ -157,7 +156,7 @@ if __name__ == "__main__":
 
     # 6. TRAINING LOOP
     warmup_epochs = 0  # Number of epochs to train without sparsity penalty
-    num_epochs = 50
+    num_epochs = 60
     gate_history = np.zeros((num_epochs, estimated_dim))
 
     print(f"Starting experiment on {device}...")
@@ -171,11 +170,12 @@ if __name__ == "__main__":
             loss, gate_values = train_epoch(
                 model, data_loader, optimizer, criterion, device
             )
+            model.anneal_temperature()  # Anneal temperature for hard concrete gates
 
             pbar.set_postfix(
                 {
                     "loss": f"{loss:.4f}",
-                    "gate values": f"{gate_values}",
+                    "gate values": f"{np.round(gate_values, 3)}",
                 }
             )
             gate_history[epoch - 1] = gate_values
@@ -187,8 +187,8 @@ if __name__ == "__main__":
         print("Training interrupted. Saving model...")
     finally:
         torch.save(model.state_dict(), "checkpoint/numerical_model.pth")
+        print("Model saved to checkpoint/numerical_model.pth")
         plot_gate_history(
             gate_history,
-            save_path="figures/numerical_gate_history_heatmap.png",
-            use_heatmap=True,
+            save_path="figures/numerical_gate_history.png",
         )
