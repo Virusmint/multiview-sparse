@@ -140,8 +140,8 @@ def parse_args() -> argparse.Namespace:
         description="Multimodal M3DI training with hard-concrete gating."
     )
     parser.add_argument("--data-root", type=str, required=True)
-    parser.add_argument("--batch-size", type=int, default=1024)
-    parser.add_argument("--num-epochs", type=int, default=50)
+    parser.add_argument("--batch-size", type=int, default=256)
+    parser.add_argument("--num-epochs", type=int, default=100)
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--temperature", type=float, default=2.0)
@@ -255,8 +255,6 @@ def main() -> None:
                 device=device,
             )
 
-            model.anneal_temperature()  # Anneal temperature for hard concrete gates
-
             pbar.set_postfix(
                 {
                     "loss": f"{loss:.4f}",
@@ -264,7 +262,7 @@ def main() -> None:
                 }
             )
             gate_history[epoch - 1] = gate_values
-            if epoch % 50 == 0 or epoch == 1:
+            if epoch % 25 == 0:
                 results = evaluate(model, val_loader, test_loader, device)
                 result_str = " | ".join([f"{k}: {v:.4f}" for k, v in results.items()])
                 print(f"Epoch {epoch:03d} |  {result_str}")
@@ -285,10 +283,6 @@ def main() -> None:
             save_path=str(gate_plot_path),
         )
         print(f"Saved gate history plot to `{gate_plot_path}`.")
-
-        # Save gate history as numpy array
-        gate_history_path = gate_plot_path.with_suffix(".npy")
-        np.save(gate_history_path, gate_history[:epoch])
 
 
 if __name__ == "__main__":
