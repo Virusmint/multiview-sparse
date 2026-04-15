@@ -70,7 +70,7 @@ class SparseInfoNCELoss(nn.Module):
     def __init__(
         self,
         encoders: MultiViewEncoders,
-        lambda_: float = 0.01,
+        lambda_: float = 0.1,
         temperature: float = 1.0,
         sim_metric: Callable = F.cosine_similarity,
     ):

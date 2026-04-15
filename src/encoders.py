@@ -65,9 +65,6 @@ class MultiViewEncoders(nn.Module):
         """
         return self.gate.get_values()  # type: ignore[attr-defined]
 
-    def anneal_temperature(self):
-        self.gate.anneal_temperature()  # type: ignore[attr-defined]
-
 
 class MLPEncoder(ViewEncoder):
     """

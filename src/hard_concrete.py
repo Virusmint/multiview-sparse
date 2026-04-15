@@ -11,7 +11,7 @@ class HardConcreteGate(nn.Module):
         beta: float = 0.66,
         gamma: float = -0.1,
         zeta: float = 1.1,
-        decay_rate: float = 0.96,
+        decay_rate: float = 0.999,
         min_beta: float = 0.1,
     ):
         super().__init__()
@@ -44,12 +44,6 @@ class HardConcreteGate(nn.Module):
             s_bar = s * (self.zeta - self.gamma) + self.gamma
             z = torch.clamp(s_bar, min=0, max=1)
         return x * z  # Apply the gate to the input
-
-    def anneal_temperature(self):
-        """
-        Anneals the beta parameter to encourage harder gating over time.
-        """
-        self.beta = max(self.beta * self.decay_rate, self.min_beta)
 
     def get_l0_penalty(self) -> torch.Tensor:
         """
