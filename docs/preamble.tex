@@ -1,8 +1,9 @@
 \usepackage{amsmath,amsfonts,amssymb} % Math packages
 \usepackage{mathtools} % For defining floor and ceiling functions
+\usepackage{comment}
 \usepackage{amsthm}    % Theorems
-\usepackage{bm} 	     % Bold math
-\usepackage{bbm}	     % More bold math?
+\usepackage{bm}        % Bold math
+\usepackage{bbm}       % More bold math?
 \usepackage{array}     % Better tables
 \usepackage{physics}   % derivatives and partials
 \usepackage{float}     % Better positioning [H]
@@ -22,15 +23,18 @@
 \usetikzlibrary{shapes,arrows,positioning} % Graph arrows
 \usetikzlibrary{automata,positioning,fit,shapes.geometric,backgrounds} % Node grouping
 \usetikzlibrary{calc, tikzmark}  % Marking equations
+\usepackage{subcaption}
+\usepackage{wrapfig}
 \renewcommand{\arraystretch}{1.6}
 
 \usepackage{mathtools}
 \newcommand{\defeq}{\vcentcolon=}
 \newcommand{\eqdef}{=\vcentcolon}
 
-\newtheorem*{definition}{Definition}
-\newtheorem*{theorem}{Theorem}
-\newtheorem*{lemma}{Lemma}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{definition}{Definition}[section]
+\newtheorem{lemma}{Lemma}[section]
+\newtheorem{assumption}{Assumption}[section]
 \theoremstyle{definition}
 \newtheorem{question}{Question}
 \pgfplotsset{width=10cm,compat=1.9}
@@ -71,11 +75,11 @@
 \DeclarePairedDelimiter\angleb{\langle}{\rangle}
 
 \geometry{
-	paper=a4paper, % Paper size, change to letterpaper for US letter size
+  paper=a4paper, % Paper size, change to letterpaper for US letter size
   margin=1in, % Margin size
-	headheight=14pt, % Header height
-	footskip=1.5cm, % Space from the bottom margin to the baseline of the footer
-	headsep=1.2cm, % Space from the top margin to the baseline of the header
+  headheight=14pt, % Header height
+  footskip=1.5cm, % Space from the bottom margin to the baseline of the footer
+  headsep=1.2cm, % Space from the top margin to the baseline of the header
 }
 
 \makeatletter
@@ -87,4 +91,3 @@
   \end{center}
 }
 \makeatother
-
