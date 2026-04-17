@@ -16,7 +16,6 @@ def plot_gate_history(
         save_path: Where to save the image
         show: Whether to pop up the window
     """
-    epochs, dims = gate_history.shape
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
     plt.figure(figsize=(10, 6))

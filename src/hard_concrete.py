@@ -11,16 +11,12 @@ class HardConcreteGate(nn.Module):
         beta: float = 0.66,
         gamma: float = -0.1,
         zeta: float = 1.1,
-        decay_rate: float = 0.999,
-        min_beta: float = 0.1,
     ):
         super().__init__()
         self.dim = dim
         self.beta = beta
         self.gamma = gamma
         self.zeta = zeta
-        self.decay_rate = decay_rate
-        self.min_beta = min_beta
 
         # We parameterize log_alpha.
         # Initializing it so that the initial gate values are slightly open.
