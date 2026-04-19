@@ -240,9 +240,9 @@ def main() -> None:
 
     # 4. TRAINING LOOP
     gate_history = np.zeros((args.num_epochs, args.estimated_dim))
-
     print(f"Starting multimodal experiment on {device}...")
     pbar = tqdm(range(1, args.num_epochs + 1), desc="Training")
+    epoch = 0
     try:
         for epoch in pbar:
             criterion.set_sparsity(epoch <= args.warmup_epochs)
@@ -278,8 +278,11 @@ def main() -> None:
         # Save gate history plot
         gate_plot_path = Path(args.gate_plot_path)
         gate_plot_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Ensure we only plot the epochs that actually ran if interrupted
+        plot_length = epoch if epoch > 0 else 1
         plot_gate_history(
-            gate_history[:epoch],
+            gate_history[:plot_length],
             save_path=str(gate_plot_path),
         )
         print(f"Saved gate history plot to `{gate_plot_path}`.")

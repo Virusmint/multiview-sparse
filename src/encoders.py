@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
 from torchvision.models import resnet18
-from typing import List
-from abc import ABC, abstractmethod
 from src.hard_concrete import HardConcreteGate
+from typing import List, Sequence
+from abc import ABC, abstractmethod
 
 
 class ViewEncoder(nn.Module, ABC):
@@ -26,29 +26,12 @@ class MultiViewEncoders(nn.Module):
 
     # NOTE: Each encoder has the same architecture, except for the input dimension.
     # We could modify this to allow for different architectures per view if needed.
-    def __init__(self, view_encoders: List[ViewEncoder]):
+    def __init__(self, view_encoders: Sequence[ViewEncoder]):
         super().__init__()
         # Create a list of view-specific encoders
         self.encoders = nn.ModuleList(view_encoders)
         self.output_dim = self._get_encoder_output_dim(self.encoders[0])
         self.gate = HardConcreteGate(dim=self.output_dim)
-
-    @staticmethod
-    def _get_encoder_output_dim(encoder: nn.Module) -> int:
-        # Most local encoders expose a `net` sequential.
-        if hasattr(encoder, "net") and isinstance(encoder.net, nn.Sequential):
-            for module in reversed(encoder.net):
-                if hasattr(module, "out_features"):
-                    return int(module.out_features)
-        # Fallback for torchvision-style and custom encoders exposing a final linear head.
-        if hasattr(encoder, "linear") and hasattr(encoder.linear, "out_features"):
-            return int(encoder.linear.out_features)
-        if hasattr(encoder, "fc") and hasattr(encoder.fc, "out_features"):
-            return int(encoder.fc.out_features)
-        raise ValueError(
-            "Could not infer encoder output dimension. "
-            "Expected one of: encoder.net[-1].out_features, encoder.linear.out_features, or encoder.fc.out_features."
-        )
 
     def forward(self, views: List[torch.Tensor]) -> List[torch.Tensor]:
         # Encodes each view into latent representation
@@ -57,13 +40,31 @@ class MultiViewEncoders(nn.Module):
         return sparse_latents
 
     def get_l0_penalty(self) -> torch.Tensor:
-        return self.gate.get_l0_penalty()  # type: ignore[attr-defined]
+        """Returns the current L0 penalty from the hard concrete gate, which can be used for regularization during training."""
+        return self.gate.get_l0_penalty()
 
     def get_gate_values(self) -> torch.Tensor:
+        """Returns the current values of the hard concrete gate (deterministic mask)"""
+        return self.gate.get_values()
+
+    @staticmethod
+    def _get_encoder_output_dim(encoder: nn.Module) -> int:
         """
-        Returns the current values of the hard concrete gate (deterministic mask)
+        Infers the output dimension of the encoder module by checking common attribute patterns.
+        Assumes the encoder has a linear layer at the end.
         """
-        return self.gate.get_values()  # type: ignore[attr-defined]
+        if hasattr(encoder, "net") and isinstance(encoder.net, nn.Sequential):
+            for module in reversed(encoder.net):
+                if hasattr(module, "out_features"):
+                    return int(module.out_features)
+        if hasattr(encoder, "linear") and hasattr(encoder.linear, "out_features"):
+            return int(encoder.linear.out_features)
+        if hasattr(encoder, "fc") and hasattr(encoder.fc, "out_features"):
+            return int(encoder.fc.out_features)
+        raise ValueError(
+            "Could not infer encoder output dimension. "
+            "Expected one of: encoder.net[-1].out_features, encoder.linear.out_features, or encoder.fc.out_features."
+        )
 
 
 class MLPEncoder(ViewEncoder):
@@ -80,10 +81,9 @@ class MLPEncoder(ViewEncoder):
         modules = []
         for i in range(len(layers) - 1):
             modules.append(nn.Linear(layers[i], layers[i + 1]))
+            # Use LeakyReLU for all layers except the last one
             if i < len(layers) - 2:
                 modules.append(nn.LeakyReLU(0.2))
-            # if i == len(layers) - 2:
-            #     modules.append(nn.Sigmoid())  # Final activation for latent space
 
         self.net = nn.Sequential(*modules)
 

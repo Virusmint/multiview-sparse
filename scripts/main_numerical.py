@@ -122,8 +122,8 @@ def evaluate(
             x_views = [x.to(device) for x in x_views]
             # Get representations from all views
             z_hats = encoder(x_views)
-            # Use the content from one view or average them
-            # Let's average them as a proxy for the 'shared' content
+            # Average the representations from each view as proxy for the shared content.
+            # Alternatively, we could eval each view seperately and/or pool them differently, but this is simpler.
             z_hat_avg = torch.stack(z_hats, dim=0).mean(dim=0)
             all_z_hat.append(z_hat_avg.cpu().numpy())
             all_z_true.append(z_true.cpu().numpy())
@@ -201,9 +201,9 @@ def main() -> None:
     # 5. TRAINING LOOP
     gate_history = np.zeros((args.num_epochs, args.estimated_dim))
     print(f"Starting experiment on {device}...")
+    pbar = tqdm(range(1, args.num_epochs + 1), desc="Training")
     epoch = 0
     try:
-        pbar = tqdm(range(1, args.num_epochs + 1), desc="Training")
         for epoch in pbar:
             criterion.set_sparsity(
                 epoch <= args.warmup_epochs

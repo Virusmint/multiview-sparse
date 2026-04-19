@@ -100,11 +100,6 @@ class SparseInfoNCELoss(nn.Module):
         total_loss = contrastive_loss + (self.lambda_ * l0_penalty)
 
         return total_loss
-        # , {
-        #     "total_loss": total_loss.item(),
-        #     "contrastive_loss": contrastive_loss.item(),
-        #     "l0_penalty": l0_penalty.item(),
-        # }
 
     def set_sparsity(self, warmup: bool):
         """

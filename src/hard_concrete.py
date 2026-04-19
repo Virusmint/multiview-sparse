@@ -36,9 +36,7 @@ class HardConcreteGate(nn.Module):
             z = torch.clamp(s_bar, min=0, max=1)  # Hard concrete gate
         else:
             # Deterministic gate values during evaluation
-            s = torch.sigmoid(self.log_alpha)
-            s_bar = s * (self.zeta - self.gamma) + self.gamma
-            z = torch.clamp(s_bar, min=0, max=1)
+            z = self.get_values()
         return x * z  # Apply the gate to the input
 
     def get_l0_penalty(self) -> torch.Tensor:

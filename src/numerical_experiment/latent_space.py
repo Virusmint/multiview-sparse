@@ -1,10 +1,11 @@
 import torch
 from torch.distributions.multivariate_normal import MultivariateNormal
-from typing import List, Callable
+from typing import List
+from abc import ABC, abstractmethod
 
 
 # -- Abstract Latent Space Definition --
-class LatentSubspace:
+class LatentSubspace(ABC):
     """
     A single causal factor or a block of factors which may or may not be causally related to each other.
     Each subspace can be arbitrarily complex and have its own distribution and sampling method.
@@ -13,9 +14,10 @@ class LatentSubspace:
     def __init__(self, dim: int):
         self.dim = dim
 
+    @abstractmethod
     def sample(self, batch_size: int, device="cpu"):
         """
-        Sample from the subspace according to its distribution.
+        Sample from the subspace according to a distribution.
         """
         raise NotImplementedError("Subclasses must implement the sample method.")
 
@@ -23,7 +25,7 @@ class LatentSubspace:
 class ProductLatentSpace:
     """
     The global latent space Z formed by concatenating multiple Latent Subspaces.
-    Each latent subspace is a block of factors that is independent of the others,
+    Each latent subspace is a block of factors that is independent from the other subspaces,
     but the factors within a subspace may be causally related.
     """
 
