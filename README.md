@@ -1,17 +1,39 @@
-Initialize a python environment and install the requirements:
+# Efficient Global Content Recovery for Multi-View Data
+
+Identifying shared content across multiple views using sparse Contrastive Representation Learning (CRL).
+
+This project has been submitted in partial fulfillment of the requirements for COMP 588: Probabilistic Graphical Models at the University of McGill.
+The final report can be found [here](./docs/report/main.pdf).
+
+## Installation
 
 ```bash
-python -m venv venv
-source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Please work through branches and pull requests. No direct commits onto the main branch.
+## Usage
 
-Currently our work is based on Yao's paper and their supporting [Github repo](https://github.com/CausalLearningAI/multiview-crl/tree/main).
+### Numerical Experiment
 
-### TODO
+Run the synthetic numerical experiment to verify causal factor independence:
 
-- [ ] Use `argparse` for numerical experiment instead of hardcoding parameters
-- [ ] Add final report to repository
-- [ ] Finish writing README
+```bash
+python scripts/main_numerical.py
+```
+
+### Multimodal Experiment
+
+To run the multimodal experiment, first prepare the [Multimodal3DIdent](https://github.com/imantdaunhawer/Multimodal3DIdent) dataset and set the path in the command below.
+
+Run the multimodal (Image-Text) experiment:
+
+```bash
+python scripts/main_multimodal.py --data-root /path/to/multimodal_data
+```
+
+### Acknowledgements
+
+This project is built upon the works of
+
+- Daunhawer et al. (2023): <https://github.com/imantdaunhawer/multimodal-contrastive-learning>
+- Yao et al. (2024): <https://github.com/CausalLearningAI/multiview-crl>
